@@ -1,0 +1,49 @@
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Development\CustomAnimNodeEditor\Definitions.CustomAnimNodeEditor.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNodeEditor\Private\AnimGraphNode_OrientationWarping.cpp
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNodeEditor\Public\AnimGraphNode_OrientationWarping.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\AnimGraph\Classes\AnimGraphNode_Base.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\UnrealEd\Public\Editor.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\UnrealEd\Classes\Editor/EditorEngine.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\UnrealEd\Classes\Editor/Transactor.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Runtime\Core\Public\Serialization/ArchiveSerializedPropertyChain.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\UnrealEd\Transactor.generated.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\UnrealEd\Classes\Settings/LevelEditorPlaySettings.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\UnrealEd\LevelEditorPlaySettings.generated.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\UnrealEd\Classes\Settings/LevelEditorViewportSettings.h
+c:\program files\epic games\ue_4.22\engine\source\editor\unrealed\public\Viewports.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\UnrealEd\Classes\Editor/UnrealEdTypes.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\UnrealEd\UnrealEdTypes.generated.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\UnrealEd\LevelEditorViewportSettings.generated.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\EditorSubsystem\Public\EditorSubsystem.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\EditorSubsystem\EditorSubsystem.generated.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\UnrealEd\EditorEngine.generated.h
+c:\program files\epic games\ue_4.22\engine\source\editor\unrealed\public\Subsystems/ImportSubsystem.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\UnrealEd\ImportSubsystem.generated.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\BlueprintGraph\Classes\K2Node.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\BlueprintGraph\Public\BlueprintNodeSignature.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\BlueprintGraph\K2Node.generated.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\AnimGraph\AnimGraphNode_Base.generated.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNode\Public\AnimNode_OrientationWarping.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Inc\CustomAnimNode\AnimNode_OrientationWarping.generated.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Inc\CustomAnimNodeEditor\AnimGraphNode_OrientationWarping.generated.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNodeEditor\Public\CustomAnimNodeEditor.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNodeEditor\Private\AnimGraphNode_PR2IK.cpp
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNodeEditor\Public\AnimGraphNode_PR2IK.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNode\Public\AnimNode_PR2IK.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Runtime\AnimGraphRuntime\Public\BoneControllers/AnimNode_SkeletalControlBase.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Runtime\Engine\Classes\Animation/InputScaleBias.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\Engine\InputScaleBias.generated.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\AnimGraphRuntime\AnimNode_SkeletalControlBase.generated.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Inc\CustomAnimNode\AnimNode_PR2IK.generated.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\AnimGraph\Classes\AnimGraphNode_SkeletalControlBase.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\AnimGraph\AnimGraphNode_SkeletalControlBase.generated.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Inc\CustomAnimNodeEditor\AnimGraphNode_PR2IK.generated.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\UnrealEd\Public\UnrealWidget.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\UnrealEd\Public\Kismet2/CompilerResultsLog.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Editor\UnrealEd\Public\EdGraphToken.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNodeEditor\Private\AnimGraphNode_SpeedWarping.cpp
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNodeEditor\Public\AnimGraphNode_SpeedWarping.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNode\Public\AnimNode_SpeedWarping.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Inc\CustomAnimNode\AnimNode_SpeedWarping.generated.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Inc\CustomAnimNodeEditor\AnimGraphNode_SpeedWarping.generated.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNodeEditor\Private\CustomAnimNodeEditor.cpp

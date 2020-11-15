@@ -1,0 +1,19 @@
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Development\CustomAnimNode\Definitions.CustomAnimNode.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNode\Private\AnimNode_OrientationWarping.cpp
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNode\Public\AnimNode_OrientationWarping.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Inc\CustomAnimNode\AnimNode_OrientationWarping.generated.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Runtime\Engine\Public\AnimationRuntime.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Runtime\Engine\Public\Animation/AnimInstanceProxy.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\Engine\AnimInstanceProxy.generated.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNode\Private\AnimNode_PR2IK.cpp
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNode\Public\AnimNode_PR2IK.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Runtime\AnimGraphRuntime\Public\BoneControllers/AnimNode_SkeletalControlBase.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Source\Runtime\Engine\Classes\Animation/InputScaleBias.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\Engine\InputScaleBias.generated.h
+C:\Program Files\Epic Games\UE_4.22\Engine\Intermediate\Build\Win64\UE4Editor\Inc\AnimGraphRuntime\AnimNode_SkeletalControlBase.generated.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Inc\CustomAnimNode\AnimNode_PR2IK.generated.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNode\Private\AnimNode_SpeedWarping.cpp
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNode\Public\AnimNode_SpeedWarping.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Inc\CustomAnimNode\AnimNode_SpeedWarping.generated.h
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNode\Private\CustomAnimNode.cpp
+C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Source\CustomAnimNode\Public\CustomAnimNode.h
