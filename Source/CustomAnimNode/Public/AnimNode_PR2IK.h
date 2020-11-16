@@ -89,8 +89,21 @@ struct CUSTOMANIMNODE_API FAnimNode_PR2IK : public FAnimNode_SkeletalControlBase
 
 public:
 	/** Name of bone to control. This is the main bone chain to modify from. **/
+
 	UPROPERTY(EditAnywhere, Category = Settings)
-		FBoneReference IkFootRootBone;
+		TEnumAsByte<enum EBoneControlSpace> TranslationSpace;
+
+	// Transform for the Gripper-Goal
+	UPROPERTY(EditAnywhere, Category = Settings, meta = (PinShownByDefault))
+		FTransform EffectorGoalTransform;
+
+	//TipBone of the chain/End Effector
+	UPROPERTY(EditAnywhere, Category = Settings)
+		FBoneReference TipBone;
+
+	//RootBone of the chain. E.g. shoulder
+	UPROPERTY(EditAnywhere, Category = Settings)
+		FBoneReference RootBone;
 
 	/*UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 		TArray<FIKBonesT> FeetDefinitions;
@@ -107,8 +120,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 		float PelvisAdjustmentAlpha;*/
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
-		float MaxIter;
 	/*
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
 		FPelvisAdjustmentInterp PelvisAdjustmentInterp;

@@ -5,15 +5,9 @@
 #include "Animation/AnimInstanceProxy.h"
 
 FAnimNode_PR2IK::FAnimNode_PR2IK() :
-	//PR2IKAxisMode(EIKFootRootLocalAxis::Y),
-	//PelvisAdjustmentAlpha(0.4f),
-	MaxIter(3.0f)
-	//ClampIKUsingFKLeg(true),
-	//RemainingTime(0.f),
-	//BoneLocation(FVector::ZeroVector),
-	//BoneVelocity(FVector::ZeroVector),
-	////TODO check if this is useful.
-	//OwnerVelocity(FVector::ZeroVector)
+	TranslationSpace(BCS_ComponentSpace),
+	EffectorGoalTransform(FTransform::Identity)
+	
 {}
 
 //interface. Must be implemented
@@ -36,7 +30,7 @@ void FAnimNode_PR2IK::UpdateInternal(const FAnimationUpdateContext& Context)
 	FAnimNode_SkeletalControlBase::UpdateInternal(Context);
 	DeltaTime += Context.GetDeltaTime();
 	// simulation step
-	TimeStep = (Context.GetDeltaTime() / MaxIter) * TimeDilation;
+	TimeStep = Context.GetDeltaTime() * TimeDilation;
 }
 
 //interface. Must be implemented
@@ -46,19 +40,49 @@ void FAnimNode_PR2IK::GatherDebugData(FNodeDebugData & DebugData)
 }
 
 //interface. Must be implemented
+//this is also where all the code goes, apperently
 void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext & Output, TArray<FBoneTransform>& OutBoneTransforms)
 {
-	//check(OutBoneTransforms.Num() == 0);
-	//const UWorld * TheWorld = Output.AnimInstanceProxy->GetAnimInstanceObject()->GetWorld();
-	//const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
+	//DEBUGGING Print to LOG
+	//UE_LOG(LogTemp, Warning, TEXT("+++AnyThread evaluation+++"));
+
+	check(OutBoneTransforms.Num() == 0);
+	// get UE World Object
+	const UWorld * TheWorld = Output.AnimInstanceProxy->GetAnimInstanceObject()->GetWorld();
+	// Create or get BoneContainer
+	const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
 
 	////get bone index and varify them exists.
-	//FCompactPoseBoneIndex IKFootRootBoneCompactPoseIndex = IkFootRootBone.GetCompactPoseIndex(BoneContainer);
-	//FCompactPoseBoneIndex PelvisBoneCompactPoseIndex = PelvisBone.GetCompactPoseIndex(BoneContainer);
-	//if (IKFootRootBoneCompactPoseIndex == INDEX_NONE || PelvisBoneCompactPoseIndex == INDEX_NONE)
-	//{
-	//	return;
-	//}
+	FCompactPoseBoneIndex TipBoneCompactPoseIndex = TipBone.GetCompactPoseIndex(BoneContainer);
+	FCompactPoseBoneIndex RootBoneCompactPoseIndex = RootBone.GetCompactPoseIndex(BoneContainer);
+	
+	// Get Component Transform. aka capsule?
+	FTransform ComponentTransform = Output.AnimInstanceProxy->GetComponentTransform();
+
+
+	// abort mission if Index is empty
+	if (TipBoneCompactPoseIndex == INDEX_NONE || RootBoneCompactPoseIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	// get Bone Transform
+	FTransform TipBoneTransform = Output.Pose.GetComponentSpaceTransform(TipBoneCompactPoseIndex);
+	FTransform RootBoneTransform = Output.Pose.GetComponentSpaceTransform(RootBoneCompactPoseIndex);
+	
+	// Translate Bone to target location
+	FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, TipBoneTransform, TipBoneCompactPoseIndex, TranslationSpace);
+	
+	// set translation
+	TipBoneTransform.SetTranslation(EffectorGoalTransform.GetTranslation());
+	
+	FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, TipBoneTransform, TipBoneCompactPoseIndex, TranslationSpace);
+
+
+	//Output the result of the calculation
+	OutBoneTransforms.Add(FBoneTransform(TipBone.GetCompactPoseIndex(BoneContainer), TipBoneTransform));
+	
+
 
 	//// Every leg apply a spring force to pelvis.
 	//TArray<FVector> TSpringForce;
@@ -241,14 +265,14 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 //
 bool FAnimNode_PR2IK::IsValidToEvaluate(const USkeleton * Skeleton, const FBoneContainer & RequiredBones)
 {
-//	return (IkFootRootBone.IsValidToEvaluate(RequiredBones));
-	return true; // Hacky AF
+	return (TipBone.IsValidToEvaluate(RequiredBones));
 }
 //
 	void FAnimNode_PR2IK::InitializeBoneReferences(const FBoneContainer & RequiredBones)
 {
-//	IkFootRootBone.Initialize(RequiredBones);
-//	PelvisBone.Initialize(RequiredBones);
+	TipBone.Initialize(RequiredBones);
+	RootBone.Initialize(RequiredBones);
+	
 //	if (!FeetDefinitions.Num() == 0)
 //	{
 //		for (FIKBonesT & Each : FeetDefinitions)

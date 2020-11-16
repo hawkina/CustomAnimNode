@@ -1,0 +1,14 @@
+/NOLOGO
+/errorReport:prompt
+/MACHINE:x64
+/SUBSYSTEM:WINDOWS
+/DEF
+/NAME:"UE4Editor-CustomAnimNodeEditor-0032.dll"
+/IGNORE:4221
+/NODEFAULTLIB
+"C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Intermediate\Build\Win64\RobCoGEditor\Development\Engine\SharedPCH.Engine.h.obj"
+"C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Development\CustomAnimNodeEditor\Module.CustomAnimNodeEditor.cpp.obj"
+"C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Development\CustomAnimNodeEditor\Module.CustomAnimNodeEditor.gen.cpp.obj"
+"C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Development\CustomAnimNodeEditor\Default.rc2.res"
+/OUT:"C:\Users\alina\Desktop\masters_thesis_code\RobCoG\Plugins\CustomAnimNode\Intermediate\Build\Win64\UE4Editor\Development\CustomAnimNodeEditor\UE4Editor-CustomAnimNodeEditor-0032.lib"
+/INCLUDE:IMPLEMENT_MODULE_CustomAnimNodeEditor

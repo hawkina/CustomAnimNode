@@ -21,7 +21,7 @@ void EmptyLinkFunctionForGeneratedCodeCustomAnimNode_init() {}
 				nullptr,
 				0,
 				PKG_CompiledIn | 0x00000000,
-				0x83F81571,
+				0x685F6997,
 				0x4F5A5D57,
 				METADATA_PARAMS(nullptr, 0)
 			};
