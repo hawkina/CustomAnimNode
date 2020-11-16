@@ -8,6 +8,7 @@ THIRD_PARTY_INCLUDES_START
 #include <cmath> //needed for Eigen, otherwise Syntax errors
 #include <algorithm> //needed for Eigen
 #include "ThirdParty/Eigen/Eigen"
+#include "ThirdParty/KDL/kdl.hpp"
 //#include "ThirdParty/Eigen/src/Array/Norms.h"
 THIRD_PARTY_INCLUDES_END
 

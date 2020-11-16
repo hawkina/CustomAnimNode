@@ -53,6 +53,7 @@ namespace UnrealBuildTool.Rules
             if (isLibrarySupported)
             {
                 PublicIncludePaths.Add(Path.Combine(ModulePath, "Eigen/eigen2"));
+                PublicIncludePaths.Add(Path.Combine(ModulePath, "KDL"));
                 //PublicIncludePaths.Add(Path.Combine(ModulePath, "Boost/include/boost-1_64"));
                 //PublicIncludePaths.Add(Path.Combine(ModulePath, "KDL_181/include/KDL-1.8"));
                 //PublicIncludePaths.Add(Path.Combine(ModulePath, "FLANN/include"));
