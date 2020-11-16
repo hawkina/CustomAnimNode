@@ -1,27 +1,32 @@
 // Copyright 2018 Sean Chen. All Rights Reserved.
 
 using UnrealBuildTool;
+using System.IO;
+using System;
 
 public class CustomAnimNodeEditor : ModuleRules
 {
+
+
     public CustomAnimNodeEditor(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+        PrivateIncludePaths.Add("CustomAnimNodeEditor/Private");
+        PublicIncludePaths.Add("CustomAnimNodeEditor/Public");
+        //     PublicIncludePaths.AddRange(
+        //         new string[] {
+        //             "CustomAnimNodeEditor/Public"
+        //	// ... add public include paths required here ...
+        //}
+        //         );
 
-   //     PublicIncludePaths.AddRange(
-   //         new string[] {
-   //             "CustomAnimNodeEditor/Public"
-			//	// ... add public include paths required here ...
-			//}
-   //         );
 
-
-   //     PrivateIncludePaths.AddRange(
-   //         new string[] {
-   //             "CustomAnimNodeEditor/Private",
-			//	// ... add other private include paths required here ...
-			//}
-   //         );
+        //     PrivateIncludePaths.AddRange(
+        //         new string[] {
+        //             "CustomAnimNodeEditor/Private",
+        //	// ... add other private include paths required here ...
+        //}
+        //         );
 
 
         PublicDependencyModuleNames.AddRange(
