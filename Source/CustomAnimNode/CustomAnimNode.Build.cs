@@ -10,10 +10,6 @@ public class CustomAnimNode : ModuleRules
         get { return ModuleDirectory; }
     }
 
-    private string ThirdPartyPath {
-        get { return Path.GetFullPath(Path.Combine(ModulePath, "../ThirdParty/")); }
-    }
-
     private string BinariesPath {
         get { return Path.GetFullPath(Path.Combine(ModulePath, "../../Binaries/")); }
     }
@@ -22,8 +18,7 @@ public class CustomAnimNode : ModuleRules
     public CustomAnimNode(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-        PrivateIncludePaths.Add("CustomAnimNode/Private");
-        PublicIncludePaths.Add("CustomAnimNode/Public");
+        //PublicIncludePaths.Add("ThirdParty");
 
         //     PublicIncludePaths.AddRange(
         //         new string[] {
@@ -34,7 +29,13 @@ public class CustomAnimNode : ModuleRules
 
 
 
-        //PublicIncludePaths.Add(Path.Combine(ModulePath, "Eigen/eigen2"));
+        PublicIncludePaths.Add(Path.Combine(ModulePath, "Public"));
+        PrivateIncludePaths.Add(Path.Combine(ModulePath, "Private"));
+
+        PublicIncludePaths.Add(Path.Combine(ModulePath, "ThirdParty/Eigen"));
+        PublicIncludePaths.Add(Path.Combine(ModulePath, "ThirdParty/KDL"));
+
+        PublicAdditionalLibraries.Add(Path.Combine(ModulePath, "ThirdParty/KDL/orocos-kdl.lib"));
 
         //     PrivateIncludePaths.AddRange(
         //         new string[] {
@@ -52,7 +53,7 @@ public class CustomAnimNode : ModuleRules
                 "Engine",
                 "AnimationCore",
                 "AnimGraphRuntime",
-                "KDL"
+                //"KDL"
 				// ... add other public dependencies that you statically link with here ...
 			}
             );
@@ -61,7 +62,9 @@ public class CustomAnimNode : ModuleRules
         PrivateDependencyModuleNames.AddRange(
             new string[]
             {
-				// ... add private dependencies that you statically link with here ...	
+			
+                //"KDL"
+                // ... add private dependencies that you statically link with here ...	
 			}
             );
 

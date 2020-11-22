@@ -97,6 +97,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = Settings, meta = (PinShownByDefault))
 		FTransform EffectorGoalTransform;
 
+
 	//TipBone of the chain/End Effector
 	UPROPERTY(EditAnywhere, Category = Settings)
 		FBoneReference TipBone;
