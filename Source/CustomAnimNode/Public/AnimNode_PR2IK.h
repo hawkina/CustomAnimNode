@@ -7,7 +7,9 @@
 #include "BoneContainer.h"
 #include "BonePose.h"
 #include "BoneControllers/AnimNode_SkeletalControlBase.h"
+#include "ThirdParty/KDL/joint.hpp"
 #include "AnimNode_PR2IK.generated.h"
+
 
 class USkeletalMeshComponent;
 
@@ -82,6 +84,50 @@ class USkeletalMeshComponent;
 //
 //};
 
+UENUM(BlueprintType)
+enum ELimitAxis{
+
+	RotX UMETA(DisplayName = "RotX"),
+	RotY UMETA(DisplayName = "RotY"),
+	RotZ UMETA(DisplayName = "RotZ"),
+
+};
+
+UENUM(BlueprintType)
+enum EJointType {
+
+	Fixed UMETA(DisplayName = "fixed"),
+	Revolute UMETA(DisplayName = "revolute")
+
+};
+
+USTRUCT()
+struct FJointLimits{
+	GENERATED_USTRUCT_BODY()
+
+	/** Name of Bone for which the limit is to be set **/
+	UPROPERTY(EditAnywhere, Category = Angular)
+		FBoneReference BoneName;
+
+	/** Which Axis should the limit apply to. Other axis will be locked.**/
+	UPROPERTY(EditAnywhere, Category = Angular)
+		TEnumAsByte<ELimitAxis> Axis;
+
+	/** Is it a movable revolute joint or a fixed joint?**/
+	UPROPERTY(EditAnywhere, Category = Angular)
+		TEnumAsByte<EJointType> JointType;
+
+	/** Minimal limit for given joint in radians**/
+	UPROPERTY(EditAnywhere, Category = Angular)
+		float LimitMin;
+
+	/** Maximal limit for given joint in radians**/
+	UPROPERTY(EditAnywhere, Category = Angular)
+		float LimitMax;
+
+};
+
+
 USTRUCT(BlueprintInternalUseOnly)
 struct CUSTOMANIMNODE_API FAnimNode_PR2IK : public FAnimNode_SkeletalControlBase
 {
@@ -106,27 +152,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = Settings)
 		FBoneReference RootBone;
 
-	/*UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
-		TArray<FIKBonesT> FeetDefinitions;
-
+	//TODO: Find a better way of doing this maybe.
+	/* Add Limits to some of the bones. Note: Every bone needs to have a limit set. Starting from Tip back to root. */
 	UPROPERTY(EditAnywhere, Category = Settings)
-		FBoneReference PelvisBone;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
-		EIKFootRootLocalAxis PR2IKAxisMode;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings, meta = (PinShownByDefault))
-		float SpeedScaling;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
-		float PelvisAdjustmentAlpha;*/
-
-	/*
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
-		FPelvisAdjustmentInterp PelvisAdjustmentInterp;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
-		bool ClampIKUsingFKLeg;*/
+		TArray<FJointLimits> RangeLimits;
 	
 
 	/** Delta time */
@@ -177,4 +206,9 @@ private:
 
 	// Resused bone transform array to avoid reallocating in skeletal controls
 	TArray<FBoneTransform> BoneTransforms;
+
+public:
+#if WITH_EDITOR
+	void ResizeRotationLimitPerJoints(int32 NewSize);
+#endif
 };

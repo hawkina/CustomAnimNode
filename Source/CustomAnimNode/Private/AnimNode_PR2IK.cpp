@@ -6,16 +6,12 @@
 
 THIRD_PARTY_INCLUDES_START
 #include <cmath> //needed for Eigen, otherwise Syntax errors
-//#include <algorithm> //needed for Eigen
-//#include "ThirdParty/Eigen/Eigen"
-//#include "ThirdParty/KDL/chain.hpp"
-//#include "ThirdParty/Eigen/src/Array/Norms.h"
-//#include <UKDL/KDL/>
 #include "ThirdParty/KDL/chain.hpp"
 #include "ThirdParty/KDL/chainiksolverpos_nr.hpp"
 #include "ThirdParty/KDL/chainfksolver.hpp"
 #include "ThirdParty/KDL/chainfksolverpos_recursive.hpp"
 #include "ThirdParty/KDL/chainiksolvervel_pinv.hpp"
+#include "ThirdParty/KDL/chainiksolverpos_nr_jl.hpp"
 #include "ThirdParty/Eigen/Geometry.h"
 THIRD_PARTY_INCLUDES_END
 
@@ -119,6 +115,13 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 	// get Component transform
 	FTransform ComponentTransform = Output.AnimInstanceProxy->GetComponentTransform();
 	//Add Segments to the chain, with the corresponding names and other data
+
+	KDL::JntArray min_limits(NameToIndex.Num()); //in rad
+	KDL::JntArray max_limits(NameToIndex.Num()); //in rad
+
+	int32 j = 0; //needed for the counter of the elements
+
+	KDL::Joint joint;
 	for (const TPair<int32, FName>& pair : NameToIndex) {
 		//get name of joint/link
 		std::string name(TCHAR_TO_UTF8(*pair.Value.ToString())); //convert ue4 string to normal string. 
@@ -137,18 +140,117 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 		FVector locVector = BoneTransform.GetTranslation();
 
 		//create chain element and add it to the chain
-		ikchain.addSegment(KDL::Segment(name, KDL::Joint(KDL::Joint::RotZ), KDL::Frame(KDL::Vector(locVector.X, locVector.Y, locVector.Z))));
+		if (RangeLimits.Num() == 0) {
+			UE_LOG(LogTemp, Warning, TEXT("No Limits set for this IK chain. Please set some Limits"));
+			return;
+		}
+		else {
+			//Check if that Element exists
+			for (int32 i = 0; i < RangeLimits.Num(); i++) {
+				//UE_LOG(LogTemp, Warning, TEXT("i: %d"), i);
+				std::string tempName(TCHAR_TO_UTF8(*RangeLimits[i].BoneName.BoneName.ToString()));
 
+				//UE_LOG(LogTemp, Warning, TEXT("temp name (from limit list): %s"), *RangeLimits[i].BoneName.BoneName.ToString());
+				//UE_LOG(LogTemp, Warning, TEXT("name: %s"), *pair.Value.ToString());
+
+				if (i < RangeLimits.Num() && tempName == name) {
+					//if element exists and this is the one, create matching joint
+					//UE_LOG(LogTemp, Warning, TEXT("Creating limits for bone: %s"), *RangeLimits[i].BoneName.BoneName.ToString());
+					min_limits.data(j) = RangeLimits[i].LimitMin;
+					max_limits.data(j) = RangeLimits[i].LimitMax;
+					//UE_LOG(LogTemp, Warning, TEXT("LimitMin: %f"), RangeLimits[i].LimitMin);
+					//UE_LOG(LogTemp, Warning, TEXT("LimitMax: %f"), RangeLimits[i].LimitMax);
+					
+					switch(RangeLimits[i].Axis.GetValue()) {
+					case RotX:
+						joint = KDL::Joint(tempName, KDL::Joint::RotX, 1, 0, 0, 0, 0);
+						UE_LOG(LogTemp, Warning, TEXT("Axis: X"));
+						break;
+
+					case RotY:
+						joint = KDL::Joint(tempName, KDL::Joint::RotY, 1, 0, 0, 0, 0);
+						UE_LOG(LogTemp, Warning, TEXT("Axis: Y"));
+						break;
+
+					case RotZ:
+						joint = KDL::Joint(tempName, KDL::Joint::RotZ, 1, 0, 0, 0, 0);
+						UE_LOG(LogTemp, Warning, TEXT("Axis: Z"));
+						break;
+
+					default:
+						joint = KDL::Joint(tempName, KDL::Joint::RotX, 1, 0, 0, 0, 0);
+						UE_LOG(LogTemp, Warning, TEXT("no axis set for this joint"));
+						break;
+					}
+
+					switch (RangeLimits[i].JointType.GetValue()) {
+					
+					case Fixed:
+						UE_LOG(LogTemp, Warning, TEXT("Fixed Joint"));
+						joint = KDL::Joint(tempName, KDL::Joint::Fixed, 1, 0, 0, 0, 0);
+						break;
+
+					case Revolute:
+						break;
+
+					default:
+						break;
+					}
+
+					ikchain.addSegment(KDL::Segment(name, joint, KDL::Frame(KDL::Vector(locVector.X, locVector.Y, locVector.Z))));
+				}
+			}
+			//when there is no limit given for that particular element.
+			//min_limits(j) = -3.12159;
+			//max_limits(j) = 3.12159;
+			//ikchain.addSegment(KDL::Segment(name, KDL::Joint(KDL::Joint::Fixed), KDL::Frame(KDL::Vector(locVector.X, locVector.Y, locVector.Z))));
+		}
+
+	
+		//check if array contains limit for our element
+		
+		j++;
 	}
 
-	//Now that we have a chain, let's apply some IK solver to it
-	KDL::ChainFkSolverPos_recursive fksolver1(ikchain);
-	KDL::ChainIkSolverVel_pinv iksolver1v(ikchain);
-	KDL::ChainIkSolverPos_NR iksolver(ikchain, fksolver1, iksolver1v, 100, 1e-2);
-	
 	KDL::JntArray result(ikchain.getNrOfJoints());
 	KDL::JntArray input(ikchain.getNrOfJoints());
 
+	//get seed state
+	int n = 0;
+	for (const TPair<int32, FName>& pair : NameToIndex) {
+		// pair int index to unreal index
+		FCompactPoseBoneIndex index = FCompactPoseBoneIndex(pair.Key);
+		//get transform of joint
+		FTransform BoneTransform = Output.Pose.GetComponentSpaceTransform(index);
+		float angle = BoneTransform.GetRotation().GetAngle();
+		
+		if ((unsigned) n < ikchain.getNrOfJoints()) {
+			input.data(n) = angle;
+		}
+		//UE_LOG(LogTemp, Warning, TEXT("------------------------"));
+		//UE_LOG(LogTemp, Warning, TEXT("input: %s"), *pair.Value.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("input: %f"), input(n));
+		//UE_LOG(LogTemp, Warning, TEXT("limit max: %f"), max_limits(n));
+		//UE_LOG(LogTemp, Warning, TEXT("limit min: %f"), min_limits(n));
+		//std::string temp1 = ikchain.getSegment(n).getName();
+		//FString temp2(temp1.c_str());
+		//UE_LOG(LogTemp, Warning, TEXT("Chain Segment name: %s"), *temp2);
+		n++;
+	}
+
+	//UE_LOG(LogTemp, Warning, TEXT("Chain length segments: %d"), ikchain.getNrOfSegments());
+	//UE_LOG(LogTemp, Warning, TEXT("Chain length joints: %d"), ikchain.getNrOfJoints());
+	//UE_LOG(LogTemp, Warning, TEXT("Max limits: %d"), max_limits.rows());
+	//UE_LOG(LogTemp, Warning, TEXT("Min limits: %d"), min_limits.rows());
+	
+	//Now that we have a chain, let's apply some IK solver to it
+	KDL::ChainFkSolverPos_recursive fksolver1(ikchain);
+	KDL::ChainIkSolverVel_pinv iksolver1v(ikchain);
+	//KDL::ChainIkSolverPos_NR iksolver(ikchain, fksolver1, iksolver1v, 100, 1e-2);
+	KDL::ChainIkSolverPos_NR_JL iksolver(ikchain, min_limits, max_limits, fksolver1, iksolver1v, 100, 1e-2);
+	iksolver.setJointLimits(min_limits, max_limits);
+
+	
 	//create destination Frame
 	// this is just a lot shorter to write... TODO: remove
 	FTransform t = EffectorGoalTransform;
@@ -172,10 +274,12 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 	KDL::Frame goal = KDL::Frame::Frame(goalrot, goalvec);
 
 	int resultInt = iksolver.CartToJnt(input, goal, result);
+	
 
 	UE_LOG(LogTemp, Warning, TEXT("Debugging soon"));
 	//these are JointAngles, aka floats, aka rotation around specified axis in radians
 	for (unsigned int i = 0; i < result.rows(); i++) {
+		UE_LOG(LogTemp, Warning, TEXT("input was %f"), input(i));
 		UE_LOG(LogTemp, Warning, TEXT("Ik solver result: %f"), result(i));
 		UE_LOG(LogTemp, Warning, TEXT("result counter: %d"), i);
 	}
@@ -199,7 +303,7 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 		//TODO: if this doesn't work, check if another TranslationSpace will work
 		//TODO: map Joint Rotation Axis to User Input of Node
 		FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, BoneTransform, index, TranslationSpace);
-
+		UE_LOG(LogTemp, Warning, TEXT("After some BoneSpace thingy conversion, before Eigen "));
 		//FQuat BoneRotation
 
 		//TODO match Axis to the User set Axis
@@ -233,206 +337,14 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 	}
 	UE_LOG(LogTemp, Warning, TEXT("After loop"));
 
-
-	
-	// Translate Bone to target location
-	//FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, TipBoneTransform, TipBoneCompactPoseIndex, TranslationSpace);
-	
-	// set translation
-	/*TipBoneTransform.SetTranslation(EffectorGoalTransform.GetTranslation());*/
-	//back in 
-	//FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, TipBoneTransform, TipBoneCompactPoseIndex, TranslationSpace);
-
-
-	//Output the result of the calculation
-	/*OutBoneTransforms.Add(FBoneTransform(TipBone.GetCompactPoseIndex(BoneContainer), TipBoneTransform));*/
-	
-
-
-	//// Every leg apply a spring force to pelvis.
-	//TArray<FVector> TSpringForce;
-	//TArray<FIKFootLocationT> TIKFootLocationTs;
-
-	//if (!FeetDefinitions.Num() == 0)
-	//{
-	//	//Calculate each foot's real position.
-	//	for (FIKBonesT & Each : FeetDefinitions)
-	//	{
-	//		bool bInvalidLimb = false;
-	//		FCompactPoseBoneIndex IKFootBoneCompactPoseIndex = Each.IKFootBone.GetCompactPoseIndex(BoneContainer);
-	//		FCompactPoseBoneIndex FKFootBoneCompactPoseIndex = Each.FKFootBone.GetCompactPoseIndex(BoneContainer);
-	//		FCompactPoseBoneIndex UpperLimbIndex(INDEX_NONE);
-	//		const FCompactPoseBoneIndex LowerLimbIndex = BoneContainer.GetParentBoneIndex(FKFootBoneCompactPoseIndex);
-
-	//		// if any leg is invalid, cancel the whole process.
-	//		if (LowerLimbIndex == INDEX_NONE)
-	//		{
-	//			bInvalidLimb = true;
-	//		}
-	//		else
-	//		{
-	//			UpperLimbIndex = BoneContainer.GetParentBoneIndex(LowerLimbIndex);
-	//			if (UpperLimbIndex == INDEX_NONE)
-	//			{
-	//				bInvalidLimb = true;
-	//			}
-	//		}
-	//		if (bInvalidLimb)
-	//		{
-	//			return;
-	//		}
-
-	//		// Get Local Space transforms for our bones.
-	//		const FTransform IKBoneLocalTransform = Output.Pose.GetLocalSpaceTransform(IKFootBoneCompactPoseIndex);
-	//		const FTransform EndBoneLocalTransform = Output.Pose.GetLocalSpaceTransform(FKFootBoneCompactPoseIndex);
-	//		const FTransform LowerLimbLocalTransform = Output.Pose.GetLocalSpaceTransform(LowerLimbIndex);
-	//		const FTransform UpperLimbLocalTransform = Output.Pose.GetLocalSpaceTransform(UpperLimbIndex);
-
-	//		// Get Component Space transforms for our bones.
-	//		FTransform IKBoneCSTransform = Output.Pose.GetComponentSpaceTransform(IKFootBoneCompactPoseIndex);
-	//		FTransform EndBoneCSTransform = Output.Pose.GetComponentSpaceTransform(FKFootBoneCompactPoseIndex);
-	//		FTransform LowerLimbCSTransform = Output.Pose.GetComponentSpaceTransform(LowerLimbIndex);
-	//		FTransform UpperLimbCSTransform = Output.Pose.GetComponentSpaceTransform(UpperLimbIndex);
-
-	//		// Get current position of root of limb. 
-	//		// All position are in Component space.
-	//		const FVector RootPos = UpperLimbCSTransform.GetTranslation();
-	//		const FVector InitialJointPos = LowerLimbCSTransform.GetTranslation();
-	//		const FVector InitialEndPos = EndBoneCSTransform.GetTranslation();
-	//		const FVector OriginIKPos = IKBoneCSTransform.GetTranslation();
-
-	//		// Length of limbs.
-	//		float LowerLimbLength = (EndBoneCSTransform.GetLocation() - LowerLimbCSTransform.GetLocation()).Size();
-	//		float UpperLimbLength = (LowerLimbCSTransform.GetLocation() - UpperLimbCSTransform.GetLocation()).Size();
-
-	//		// Get scale pivot
-	//		const FVector ScalePivot = FVector(RootPos.X, RootPos.Y, OriginIKPos.Z);
-
-	//		// Calculate new IKPos
-	//		FVector NewIKPos = OriginIKPos;
-	//		switch (PR2IKAxisMode)
-	//		{
-	//		case EIKFootRootLocalAxis::NONE:
-	//			break;
-	//		case EIKFootRootLocalAxis::X:
-	//			NewIKPos.X = ((OriginIKPos - ScalePivot).X * SpeedScaling) + ScalePivot.X;
-	//		case EIKFootRootLocalAxis::Y:
-	//			NewIKPos.Y = ((OriginIKPos - ScalePivot).Y * SpeedScaling) + ScalePivot.Y;
-	//		case EIKFootRootLocalAxis::Z:
-	//			NewIKPos.Z = ((OriginIKPos - ScalePivot).Z * SpeedScaling) + ScalePivot.Z;
-	//		default:
-	//			break;
-	//		}
-
-	//		// Clamp Ik foot position use total leg length.
-	//		FVector ActualIKPos = NewIKPos;
-	//		if (ClampIKUsingFKLeg)
-	//		{
-	//			float OriginIKLength = (OriginIKPos - RootPos).Size();
-	//			float NewIkLength = (NewIKPos - RootPos).Size();
-	//			float CutoffPercent = 1 - (1 / SpeedScaling);
-	//			float TotalLimbLength = LowerLimbLength + UpperLimbLength;
-	//			float MaxScaledLimbLength = OriginIKLength + (TotalLimbLength - OriginIKLength) * CutoffPercent;
-	//			FVector IKDirection = (NewIKPos - RootPos).GetSafeNormal();
-	//			if (NewIkLength > OriginIKLength)
-	//			{
-	//				FVector AdjustedIKPos = NewIKPos + IKDirection * (MaxScaledLimbLength - NewIkLength);
-	//				ActualIKPos = (AdjustedIKPos - RootPos).Size() > (ActualIKPos - RootPos).Size() ? ActualIKPos : AdjustedIKPos;
-	//			}
-	//		}
-
-	//		// Set Ik foot's actual position.
-	//		IKBoneCSTransform.SetTranslation(ActualIKPos);
-	//		OutBoneTransforms.Add(FBoneTransform(IKFootBoneCompactPoseIndex, IKBoneCSTransform));
-
-	//		// Record origin and actual IK foot position.
-	//		FIKFootLocationT IKFootLocationT;
-	//		IKFootLocationT.LimbRootLocation = RootPos;
-	//		IKFootLocationT.OriginLocation = OriginIKPos;
-	//		IKFootLocationT.ActualLocation = ActualIKPos;
-	//		IKFootLocationT.NewLocation = NewIKPos;
-	//		TIKFootLocationTs.Add(IKFootLocationT);
-	//	}
-	//}
-
-	//// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-	//// Calculate influence upon pelvis by this leg, according to actual Ik foot position.
-	////++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-	//for (FIKFootLocationT EachIK : TIKFootLocationTs)
-	//{
-	//	// Init values first time
-	//	RemainingTime = DeltaTime;
-	//	BoneLocation = EachIK.OriginLocation;
-	//	BoneVelocity = FVector::ZeroVector;
-	//	//		GEngine->AddOnScreenDebugMessage(17, 10, FColor::Green, FString::Printf(TEXT("OriginIKSize: %0.5f"), EachIK.OriginLocation.Size()));
-
-	//	while (RemainingTime > TimeStep)
-	//	{
-	//		// Calculate error vector.
-	//		FVector const IKDirection = (EachIK.ActualLocation - EachIK.LimbRootLocation).GetSafeNormal();
-	//		float IKStretch = ((EachIK.ActualLocation - EachIK.LimbRootLocation).Size() - (EachIK.OriginLocation - EachIK.LimbRootLocation).Size());
-	//		FVector const Error = IKDirection * IKStretch;
-	//		FVector const SpringForce = PelvisAdjustmentInterp.Stiffness * Error;
-	//		FVector const DampingForce = PelvisAdjustmentInterp.Dampen * BoneVelocity;
-
-	//		// Calculate force based on error and velocity
-	//		FVector const Acceleration = SpringForce - DampingForce;
-
-	//		// Integrate velocity
-	//		// Make sure damping with variable frame rate actually dampens velocity. Otherwise Spring will go nuts.
-	//		float const CutOffDampingValue = 1.f / TimeStep;
-	//		if (PelvisAdjustmentInterp.Dampen > CutOffDampingValue)
-	//		{
-	//			float const SafetyScale = CutOffDampingValue / PelvisAdjustmentInterp.Dampen;
-	//			BoneVelocity += SafetyScale * (Acceleration * TimeStep);
-	//		}
-	//		else
-	//		{
-	//			BoneVelocity += (Acceleration * TimeStep);
-	//		}
-
-	//		// Integrate position
-	//		FVector const OldBoneLocation = BoneLocation;
-	//		FVector const DeltaMove = (BoneVelocity * TimeStep);
-	//		BoneLocation += DeltaMove;
-
-	//		// Update velocity to reflect post processing done to bone location.
-	//		BoneVelocity = (BoneLocation - OldBoneLocation) / TimeStep;
-
-	//		check(!BoneLocation.ContainsNaN());
-	//		check(!BoneVelocity.ContainsNaN());
-
-	//		// End of calculation.
-	//		RemainingTime -= TimeStep;
-	//	}
-	//	TSpringForce.Add(BoneVelocity);
-	//}
-	//// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-	//// Calculate resultant force.
-	//FVector ResultantForce = FVector(0.0f, 0.0f, 0.0f);
-	//for (FVector const EachVector : TSpringForce)
-	//{
-	//	ResultantForce += EachVector;
-	//}
-
-	////Calculate actual adjusted pelvis posiiton.
-	//FTransform PelvisBoneCSTransform = Output.Pose.GetComponentSpaceTransform(PelvisBoneCompactPoseIndex);
-	//FVector OriginPelvisLocation = PelvisBoneCSTransform.GetLocation();
-	//FVector NewPelvisLocation = OriginPelvisLocation + ResultantForce;
-	//FVector ActralPelvisLocation = OriginPelvisLocation + (ResultantForce * PelvisAdjustmentAlpha);
-
-	//// Set new pelvis transform.
-	//PelvisBoneCSTransform.SetTranslation(ActralPelvisLocation);
-	//OutBoneTransforms.Insert(FBoneTransform(PelvisBoneCompactPoseIndex, PelvisBoneCSTransform), 0);
-
 }
 //
 bool FAnimNode_PR2IK::IsValidToEvaluate(const USkeleton * Skeleton, const FBoneContainer & RequiredBones)
 {
 	return (TipBone.IsValidToEvaluate(RequiredBones));
 }
-//
+
+
 	void FAnimNode_PR2IK::InitializeBoneReferences(const FBoneContainer & RequiredBones)
 {
 	TipBone.Initialize(RequiredBones);

@@ -7,12 +7,16 @@ using System;
 public class CustomAnimNodeEditor : ModuleRules
 {
 
+    private string ModulePath {
+        get { return ModuleDirectory; }
+    }
+
 
     public CustomAnimNodeEditor(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-        PrivateIncludePaths.Add("CustomAnimNodeEditor/Private");
-        PublicIncludePaths.Add("CustomAnimNodeEditor/Public");
+        PublicIncludePaths.Add(Path.Combine(ModulePath, "Public"));
+        PrivateIncludePaths.Add(Path.Combine(ModulePath, "Private"));
         //     PublicIncludePaths.AddRange(
         //         new string[] {
         //             "CustomAnimNodeEditor/Public"
@@ -48,7 +52,7 @@ public class CustomAnimNodeEditor : ModuleRules
                 "Slate",
                 "SlateCore",
                 "AnimGraph",
-                "BlueprintGraph"
+                "BlueprintGraph",
 				// ... add private dependencies that you statically link with here ...	
 			}
             );
