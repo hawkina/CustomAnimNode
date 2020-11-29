@@ -12,22 +12,22 @@
 	"SupportURL": "",
 	"CanContainContent": true,
 	"Installed": true,
-	"Modules": [
-		{
-			"Name": "CustomAnimNode",
-			"Type": "Runtime",
-			"LoadingPhase": "PreDefault",
-			"WhitelistPlatforms": [
-				"Win64"
-			]
-		},
-		{
-			"Name": "CustomAnimNodeEditor",
-			"Type": "Editor",
-			"LoadingPhase": "PreDefault",
-			"WhitelistPlatforms": [
-				"Win64"
-			]
-		}
-	]
+  "Modules": [
+    {
+      "Name": "CustomAnimNode",
+      "Type": "Runtime",
+      "LoadingPhase": "PreDefault",
+      "WhitelistPlatforms": [
+        "Win64"
+      ]
+    },
+    {
+      "Name": "CustomAnimNodeEditor",
+      "Type": "Editor",
+      "LoadingPhase": "PreDefault",
+      "WhitelistPlatforms": [
+        "Win64"
+      ]
+    }
+  ]
 }
