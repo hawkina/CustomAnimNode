@@ -12,14 +12,31 @@ THIRD_PARTY_INCLUDES_START
 #include "ThirdParty/KDL/chainfksolverpos_recursive.hpp"
 #include "ThirdParty/KDL/chainiksolvervel_pinv.hpp"
 #include "ThirdParty/KDL/chainiksolverpos_nr_jl.hpp"
+#include "Components/PoseableMeshComponent.h"
+#include "UObject/UObjectGlobals.h"
 #include "ThirdParty/Eigen/Geometry.h"
 THIRD_PARTY_INCLUDES_END
 
+FTransform FlipTransform(FTransform const& input)
+{
+	return input;
+	FTransform retq = input;
+	double x = retq.GetLocation().X;
+	double y = retq.GetLocation().Y;
+	double z = retq.GetLocation().Z;
+	retq.SetLocation(FVector(x, y, z));
+	x = retq.GetRotation().GetRotationAxis().X;
+	y = retq.GetRotation().GetRotationAxis().Y;
+	z = retq.GetRotation().GetRotationAxis().Z;
+	retq.SetRotation(FQuat(FVector(x,y,z), retq.GetRotation().GetAngle()));
+	return retq;
+}
+
 FAnimNode_PR2IK::FAnimNode_PR2IK() :
-	TranslationSpace(BCS_BoneSpace),
-	EffectorGoalTransform(FTransform::Identity)
-	
-{}
+	TranslationSpace(BCS_WorldSpace),
+	EffectorGoalTransform(FTransform::Identity)	
+{
+}
 
 //interface. Must be implemented
 void FAnimNode_PR2IK::Initialize_AnyThread(const FAnimationInitializeContext& Context)
@@ -57,137 +74,172 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 	check(OutBoneTransforms.Num() == 0);
 
 	//DEBUGGING Print to LOG
-	UE_LOG(LogTemp, Warning, TEXT("+++AnyThread evaluation+++"));
+	/*UE_LOG(LogTemp, Warning, TEXT("+++AnyThread evaluation+++"));*/
 
-	check(OutBoneTransforms.Num() == 0);
+
 	// get UE World Object
 	const UWorld * TheWorld = Output.AnimInstanceProxy->GetAnimInstanceObject()->GetWorld();
 	// Create or get BoneContainer
 	const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
 
-	////get bone index and varify them exists.
+	//get bone index and varify them exists.
 	FCompactPoseBoneIndex TipBoneIndex = TipBone.GetCompactPoseIndex(BoneContainer);
 	//FCompactPoseBoneIndex RootBoneCompactPoseIndex = RootBone.GetCompactPoseIndex(BoneContainer);
 	
-	//get Bone Chain by getting all indices from root to tip
-	TArray<FCompactPoseBoneIndex> BoneIndices;
-	// essentially Int and String...
-	TMap<int32, FName> NameToIndex;
-
-	//for applying transforms
-	TArray<FBoneTransform> TempTransform;
-
-	{
-		FCompactPoseBoneIndex RootIndex = RootBone.GetCompactPoseIndex(BoneContainer);
-		FCompactPoseBoneIndex BoneIndex = TipBone.GetCompactPoseIndex(BoneContainer);
+	//ensure that the order gets preserved
+	TArray<TPair<int32, FName> > NameToIndex;
+	FCompactPoseBoneIndex RootIndex = RootBone.GetCompactPoseIndex(BoneContainer);
+	FCompactPoseBoneIndex BoneIndex = TipBone.GetCompactPoseIndex(BoneContainer);
 		//abbort mission if index does not exist
 		if (BoneIndex == INDEX_NONE || RootIndex == INDEX_NONE)
 		{
 			return;
 		}
-
+		//get first bone
 		FName BoneName = Output.AnimInstanceProxy->GetSkelMeshComponent()->GetBoneName(BoneIndex.GetInt());
-		NameToIndex.Add(BoneIndex.GetInt(), BoneName);
+		NameToIndex.Add(TPair<int32, FName>(BoneIndex.GetInt(), BoneName));
+		//collect all the other bones
 		do
 		{
-			BoneIndices.Insert(BoneIndex, 0);
 			BoneIndex = Output.Pose.GetPose().GetParentBoneIndex(BoneIndex);
 			BoneName = Output.AnimInstanceProxy->GetSkelMeshComponent()->GetBoneName(BoneIndex.GetInt());
-			NameToIndex.Add(BoneIndex.GetInt(), BoneName);
-
+			NameToIndex.Add(TPair<int32, FName>(BoneIndex.GetInt(), BoneName));
 		} while (BoneIndex != RootIndex);
-		BoneIndices.Insert(BoneIndex, 0);
-		NameToIndex.Add(BoneIndex.GetInt(), BoneName);
+		//add last bone, because the condition will be false
+		//NameToIndex.Add(TPair<int32, FName>(BoneIndex.GetInt(), BoneName));
+
+		TArray<TPair<int32, FName> > NewNameToIndex;
+
+
+		//reverse The Map, so that the order is from Root to Tip
+		for (signed int i = 0; i < NameToIndex.Num(); i++) {
+			unsigned int k = NameToIndex.Num() - i - 1;
+			NewNameToIndex.Add(NameToIndex[k]);
+		}
+
 
 		//Print the list to ensure it is correct:
-		FString name;
-		for (const TPair<int32, FName>& pair : NameToIndex){
-			name = pair.Value.ToString();
-			UE_LOG(LogTemp, Warning, TEXT("Bone Name: %s"), *name);
-			UE_LOG(LogTemp, Warning, TEXT("Index: %d"), pair.Key);
-		
+		FString namePair;
+		for (const TPair<int32, FName>& pair : NewNameToIndex){
+			namePair = pair.Value.ToString();
+			//UE_LOG(LogTemp, Warning, TEXT("Bone Name: %s"), *namePair);
+			//UE_LOG(LogTemp, Warning, TEXT("Index: %d"), pair.Key);
 		}
-	}
+	
 	
 
-	//Create a KDL Chain
+	//------------------------------------- Create a KDL Chain -------------------------------------------
 	KDL::Chain ikchain;
 	// get Component transform
 	FTransform ComponentTransform = Output.AnimInstanceProxy->GetComponentTransform();
-	//Add Segments to the chain, with the corresponding names and other data
+	ComponentTransform = FlipTransform(ComponentTransform);
+	ComponentTransform.SetLocation(ComponentTransform.GetLocation() / 100);
+	ComponentTransform.SetScale3D(FVector(1.0, 1.0, 1.0));
 
-	KDL::JntArray min_limits(NameToIndex.Num()); //in rad
-	KDL::JntArray max_limits(NameToIndex.Num()); //in rad
+	//convert effector goal transform into component space, given it is provied in world space
+	FTransform ScaledEffectorGoalTransform = EffectorGoalTransform;
+	ScaledEffectorGoalTransform = FlipTransform(ScaledEffectorGoalTransform);
+	ScaledEffectorGoalTransform.SetLocation(ScaledEffectorGoalTransform.GetLocation() / 100);
+	ScaledEffectorGoalTransform.SetScale3D(FVector(1.0, 1.0, 1.0));
+	//UE_LOG(LogTemp, Warning, TEXT("Before: %s \n"), *ScaledEffectorGoalTransform.ToHumanReadableString());
+	FQuat dq(FRotator(ScaledEffectorGoalTransform.GetRotation().Rotator().Pitch, ScaledEffectorGoalTransform.GetRotation().Rotator().Yaw + 0, ScaledEffectorGoalTransform.GetRotation().Rotator().Roll));
+	ScaledEffectorGoalTransform.SetRotation(dq);
+	//UE_LOG(LogTemp, Warning, TEXT("After: %s \n"), *ScaledEffectorGoalTransform.ToHumanReadableString());
 
+	//UE_LOG(LogTemp, Warning, TEXT("------------------------------"));
+	//UE_LOG(LogTemp, Warning, TEXT("Effector Goal Transform (Original): %s \n"), *EffectorGoalTransform.ToHumanReadableString());
+	//UE_LOG(LogTemp, Warning, TEXT("Scaled Effector Goal Transform %s \n"), *ScaledEffectorGoalTransform.ToHumanReadableString());
+	//UE_LOG(LogTemp, Warning, TEXT("Inverse Component Transform: %s \n"), *ComponentTransform.Inverse().ToHumanReadableString());
+	//UE_LOG(LogTemp, Warning, TEXT("------------------------------"));
+
+	KDL::JntArray temp_min_limits(NameToIndex.Num()); //in rad
+	KDL::JntArray temp_max_limits(NameToIndex.Num()); //in rad
+
+	//iterate over all elements, find matching limits and add create the joints
 	int32 j = 0; //needed for the counter of the elements
+	for (const TPair<int32, FName>& pair : NewNameToIndex) {
+		//UE_LOG(LogTemp, Warning, TEXT("Creating Segment for: %s"), *pair.Value.ToString());
 
-	KDL::Joint joint;
-	for (const TPair<int32, FName>& pair : NameToIndex) {
+		//make sure a new one is created each time
+		KDL::Joint joint;
+
+
+		FCompactPoseBoneIndex index = FCompactPoseBoneIndex(pair.Key);
+		FCompactPoseBoneIndex ParentIndex = Output.Pose.GetPose().GetParentBoneIndex(index);
+		
 		//get name of joint/link
 		std::string name(TCHAR_TO_UTF8(*pair.Value.ToString())); //convert ue4 string to normal string. 
-
-		
+		//need to access it this way since this might be outside of our usual chain
+		std::string ParentName(TCHAR_TO_UTF8(*Output.AnimInstanceProxy->GetSkelMeshComponent()->GetBoneName(ParentIndex.GetInt()).ToString()));
 		// pair int index to unreal index
-		FCompactPoseBoneIndex index = FCompactPoseBoneIndex(pair.Key);
-		//get transform of joint
-		FTransform BoneTransform = Output.Pose.GetComponentSpaceTransform(index);
+		
+		//get Parent index for joint
+		
 
-		//transform transform to bone space, aka. relative from one bone to another (hopefully)
-		//TODO: if this doesn't work, check if another TranslationSpace will work
-		//TODO: map Joint Rotation Axis to User Input of Node
-		FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, BoneTransform, index, TranslationSpace);
-		//get vector of transform
-		FVector locVector = BoneTransform.GetTranslation();
 
 		//create chain element and add it to the chain
+		FTransform BoneLocalTransform = Output.Pose.GetLocalSpaceTransform(index);
+		BoneLocalTransform = FlipTransform(BoneLocalTransform);
+		FVector JointOriginUE = BoneLocalTransform.GetTranslation();
+		
+		//UE_LOG(LogTemp, Warning, TEXT("Setting Joint Origin to:  %s"), *BoneLocalTransform.GetTranslation().ToString());
+		KDL::Vector JointOrigin = KDL::Vector(JointOriginUE.X, JointOriginUE.Y, JointOriginUE.Z);
+		KDL::Vector VecX = KDL::Vector(1.0, 0.0, 0.0);
+		KDL::Vector VecY = KDL::Vector(0.0, 1.0, 0.0);
+		KDL::Vector VecZ = KDL::Vector(0.0, 0.0, 1.0);
+
 		if (RangeLimits.Num() == 0) {
-			UE_LOG(LogTemp, Warning, TEXT("No Limits set for this IK chain. Please set some Limits"));
+			//UE_LOG(LogTemp, Warning, TEXT("No Limits set for this IK chain. Please set some Limits"));
 			return;
 		}
 		else {
 			//Check if that Element exists
 			for (int32 i = 0; i < RangeLimits.Num(); i++) {
-				//UE_LOG(LogTemp, Warning, TEXT("i: %d"), i);
+
+				//UE_LOG(LogTemp, Warning, TEXT("found limits for bone name: %s"), *RangeLimits[i].BoneName.BoneName.ToString());
 				std::string tempName(TCHAR_TO_UTF8(*RangeLimits[i].BoneName.BoneName.ToString()));
 
-				//UE_LOG(LogTemp, Warning, TEXT("temp name (from limit list): %s"), *RangeLimits[i].BoneName.BoneName.ToString());
-				//UE_LOG(LogTemp, Warning, TEXT("name: %s"), *pair.Value.ToString());
-
-				if (i < RangeLimits.Num() && tempName == name) {
+				//check if limit exist for current bone
+				if ((i < RangeLimits.Num()) && (tempName == name)) {
 					//if element exists and this is the one, create matching joint
-					//UE_LOG(LogTemp, Warning, TEXT("Creating limits for bone: %s"), *RangeLimits[i].BoneName.BoneName.ToString());
-					min_limits.data(j) = RangeLimits[i].LimitMin;
-					max_limits.data(j) = RangeLimits[i].LimitMax;
+					temp_min_limits.data(j) = RangeLimits[i].LimitMin;
+					temp_max_limits.data(j) = RangeLimits[i].LimitMax;
 					//UE_LOG(LogTemp, Warning, TEXT("LimitMin: %f"), RangeLimits[i].LimitMin);
 					//UE_LOG(LogTemp, Warning, TEXT("LimitMax: %f"), RangeLimits[i].LimitMax);
 					
+					KDL::Vector VecT;
+
+
 					switch(RangeLimits[i].Axis.GetValue()) {
 					case RotX:
-						joint = KDL::Joint(tempName, KDL::Joint::RotX, 1, 0, 0, 0, 0);
-						UE_LOG(LogTemp, Warning, TEXT("Axis: X"));
+						joint = KDL::Joint(tempName, JointOrigin, VecX, KDL::Joint::RotAxis, 1, 0, 0, 0, 0);
+						VecT = VecX;
+						//UE_LOG(LogTemp, Warning, TEXT("Axis: X"));
 						break;
 
 					case RotY:
-						joint = KDL::Joint(tempName, KDL::Joint::RotY, 1, 0, 0, 0, 0);
-						UE_LOG(LogTemp, Warning, TEXT("Axis: Y"));
+						joint = KDL::Joint(tempName, JointOrigin, VecY, KDL::Joint::RotAxis, 1, 0, 0, 0, 0);
+						//UE_LOG(LogTemp, Warning, TEXT("Axis: Y"));
+						VecT = VecY;
 						break;
 
 					case RotZ:
-						joint = KDL::Joint(tempName, KDL::Joint::RotZ, 1, 0, 0, 0, 0);
-						UE_LOG(LogTemp, Warning, TEXT("Axis: Z"));
+						joint = KDL::Joint(tempName, JointOrigin, VecZ, KDL::Joint::RotAxis, 1, 0, 0, 0, 0);
+						/*UE_LOG(LogTemp, Warning, TEXT("Axis: Z"));*/
+						VecT = VecZ;
 						break;
 
 					default:
-						joint = KDL::Joint(tempName, KDL::Joint::RotX, 1, 0, 0, 0, 0);
-						UE_LOG(LogTemp, Warning, TEXT("no axis set for this joint"));
+						joint = KDL::Joint(tempName, JointOrigin, VecZ, KDL::Joint::RotAxis, 1, 0, 0, 0, 0);
+						/*UE_LOG(LogTemp, Warning, TEXT("no axis set for this joint"));*/
 						break;
 					}
 
 					switch (RangeLimits[i].JointType.GetValue()) {
 					
 					case Fixed:
-						UE_LOG(LogTemp, Warning, TEXT("Fixed Joint"));
-						joint = KDL::Joint(tempName, KDL::Joint::Fixed, 1, 0, 0, 0, 0);
+						/*UE_LOG(LogTemp, Warning, TEXT("Fixed Joint"));*/
+						joint = KDL::Joint(tempName, JointOrigin, VecT, KDL::Joint::RotAxis, 1, 0, 0, 0, 0);
 						break;
 
 					case Revolute:
@@ -197,18 +249,28 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 						break;
 					}
 
-					ikchain.addSegment(KDL::Segment(name, joint, KDL::Frame(KDL::Vector(locVector.X, locVector.Y, locVector.Z))));
+					//get transform of current joint aka bone origin
+					
+
+					FTransform BoneTransform = Output.Pose.GetLocalSpaceTransform(index);
+					BoneTransform = FlipTransform(BoneTransform);
+					//get vector of transform
+					FVector locVector = BoneTransform.GetTranslation();
+
+					KDL::Rotation offsetRotation;
+					if (name == "r_shoulder_pan_link") {
+						//offsetRotation = KDL::Rotation::RotZ(-3.14159 / 2);
+						/*UE_LOG(LogTemp, Error, TEXT("Offset Set"));*/
+					}
+
+					ikchain.addSegment(KDL::Segment(name, joint, KDL::Frame(offsetRotation, KDL::Vector(locVector.X, locVector.Y, locVector.Z))));
+					//UE_LOG(LogTemp, Warning, TEXT("LimitMin: for Segment: %f"), temp_min_limits(i));
+					//UE_LOG(LogTemp, Warning, TEXT("LimitMax: for Segment %f"), temp_max_limits(i));
+					
+					
 				}
 			}
-			//when there is no limit given for that particular element.
-			//min_limits(j) = -3.12159;
-			//max_limits(j) = 3.12159;
-			//ikchain.addSegment(KDL::Segment(name, KDL::Joint(KDL::Joint::Fixed), KDL::Frame(KDL::Vector(locVector.X, locVector.Y, locVector.Z))));
 		}
-
-	
-		//check if array contains limit for our element
-		
 		j++;
 	}
 
@@ -216,129 +278,320 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 	KDL::JntArray input(ikchain.getNrOfJoints());
 
 	//get seed state
-	int n = 0;
-	for (const TPair<int32, FName>& pair : NameToIndex) {
+	unsigned int n = 0;
+	for (const TPair<int32, FName>& pair : NewNameToIndex) {
 		// pair int index to unreal index
 		FCompactPoseBoneIndex index = FCompactPoseBoneIndex(pair.Key);
-		//get transform of joint
-		FTransform BoneTransform = Output.Pose.GetComponentSpaceTransform(index);
-		float angle = BoneTransform.GetRotation().GetAngle();
-		
-		if ((unsigned) n < ikchain.getNrOfJoints()) {
-			input.data(n) = angle;
+
+		double oldAngle = 0.0;
+		if (this->previousAngles.Contains(index.GetInt())) {
+			oldAngle = previousAngles[index.GetInt()];
 		}
-		//UE_LOG(LogTemp, Warning, TEXT("------------------------"));
-		//UE_LOG(LogTemp, Warning, TEXT("input: %s"), *pair.Value.ToString());
-		//UE_LOG(LogTemp, Warning, TEXT("input: %f"), input(n));
-		//UE_LOG(LogTemp, Warning, TEXT("limit max: %f"), max_limits(n));
-		//UE_LOG(LogTemp, Warning, TEXT("limit min: %f"), min_limits(n));
-		//std::string temp1 = ikchain.getSegment(n).getName();
-		//FString temp2(temp1.c_str());
-		//UE_LOG(LogTemp, Warning, TEXT("Chain Segment name: %s"), *temp2);
+		
+		//this is done for "seeding" aka give pose of where joint is right now instead of default. let's do it without first
+		if (n < ikchain.getNrOfJoints()) {
+			input.data(n) = oldAngle;
+			
+			//UE_LOG(LogTemp, Warning, TEXT("Angle:  %f"), angle);
+			//UE_LOG(LogTemp, Warning, TEXT("Angle in input:  %f"), input.data(n));
+			//UE_LOG(LogTemp, Warning, TEXT("counter:  %d"), n);
+			//UE_LOG(LogTemp, Warning, TEXT("Nr of Joints:  %d"), ikchain.getNrOfJoints());
+			
+			if (!((oldAngle <= temp_max_limits.data(n)) && (oldAngle >= temp_min_limits.data(n)))) {
+				//UE_LOG(LogTemp, Error, TEXT("ANGLE OUT OF BOUNDS!!!"));
+				//UE_LOG(LogTemp, Error, TEXT("Joint: %s"), *pair.Value.ToString());
+				//UE_LOG(LogTemp, Error, TEXT("temp Max Limit:  %f"), temp_max_limits.data(n));
+				//UE_LOG(LogTemp, Error, TEXT("temp Min Limit:  %f"), temp_min_limits.data(n));
+				//UE_LOG(LogTemp, Error, TEXT("Angle: %f \n"), oldAngle);
+			}
+		}
 		n++;
 	}
 
-	//UE_LOG(LogTemp, Warning, TEXT("Chain length segments: %d"), ikchain.getNrOfSegments());
-	//UE_LOG(LogTemp, Warning, TEXT("Chain length joints: %d"), ikchain.getNrOfJoints());
-	//UE_LOG(LogTemp, Warning, TEXT("Max limits: %d"), max_limits.rows());
-	//UE_LOG(LogTemp, Warning, TEXT("Min limits: %d"), min_limits.rows());
+	
+
+
 	
 	//Now that we have a chain, let's apply some IK solver to it
 	KDL::ChainFkSolverPos_recursive fksolver1(ikchain);
-	KDL::ChainIkSolverVel_pinv iksolver1v(ikchain);
+	KDL::ChainIkSolverVel_pinv iksolver1v(ikchain,1e-5,400);
 	//KDL::ChainIkSolverPos_NR iksolver(ikchain, fksolver1, iksolver1v, 100, 1e-2);
-	KDL::ChainIkSolverPos_NR_JL iksolver(ikchain, min_limits, max_limits, fksolver1, iksolver1v, 100, 1e-2);
-	iksolver.setJointLimits(min_limits, max_limits);
-
+	KDL::ChainIkSolverPos_NR_JL iksolver(ikchain, temp_min_limits, temp_max_limits, fksolver1, iksolver1v, 400, 1e-6);
+	//iksolver.setJointLimits(min_limits, max_limits);
 	
 	//create destination Frame
-	// this is just a lot shorter to write... TODO: remove
-	FTransform t = EffectorGoalTransform;
-	KDL::Vector goalvec = KDL::Vector::Vector(t.GetLocation().X, t.GetLocation().Y, t.GetLocation().Z);
-	FQuat rot = t.GetRotation();
-	
-	//convert quaternion into rotation matrix
-	Eigen::Quaterniond quat;
-	
-	quat.x() = rot.X;
-	quat.y() = rot.Y;
-	quat.z() = rot.Z;
-	quat.w() = rot.W;
+	//transform goal pose from world frame into bone frame
+	//recalculate the goal transform to be relative to our RootBone
+	FTransform RootTransformComp = Output.Pose.GetComponentSpaceTransform(Output.Pose.GetPose().GetParentBoneIndex(RootIndex));
+	RootTransformComp = FlipTransform(RootTransformComp);
+	RootTransformComp.SetLocation(RootTransformComp.GetLocation() / 100);
+	RootTransformComp.SetScale3D(FVector(1.0, 1.0, 1.0));
+	FTransform adjustYaw;
+	adjustYaw.SetRotation(FQuat(FVector(0, 0, 1), 3.14159 / 2));
+	FTransform GoalInBoneSpace = adjustYaw*ScaledEffectorGoalTransform * ComponentTransform.Inverse() * RootTransformComp.Inverse();
 
-	Eigen::Matrix3d mat;
-	mat = quat.normalized().toRotationMatrix();
+
+	//Fix scale...
+	GoalInBoneSpace.SetScale3D(FVector(1.0, 1.0, 1.0));
+	//UE_LOG(LogTemp, Warning, TEXT("------------------------------"));
+	//UE_LOG(LogTemp, Warning, TEXT("Component Transform: %s \n"), *ComponentTransform.ToHumanReadableString());
+	//UE_LOG(LogTemp, Warning, TEXT("Root Transform in Component Inverse: %s \n"), *RootTransformComp.Inverse().ToHumanReadableString());
+	//UE_LOG(LogTemp, Warning, TEXT("Goal Transform in Bone Space: %s \n"), *GoalInBoneSpace.ToHumanReadableString());
+	//UE_LOG(LogTemp, Warning, TEXT("------------------------------"));
+	//transform goal into component space
 	
-	// if not mistaken, Xx, Xy, Xz, Yx, Yy, Yz, Zx, Zy, Zz
-	KDL::Rotation goalrot = KDL::Rotation::Rotation(mat(0), mat(1), mat(2), mat(3), mat(4), mat(5), mat(6), mat(7), mat(8));
+	//UE_LOG(LogTemp, Warning, TEXT("KDL Goal Translation: %f, %f, %f"), goal.p.x(), goal.p.y(), goal.p.z());
+	FTransform TipTransform = Output.Pose.GetComponentSpaceTransform(TipBoneIndex);
+	TipTransform = FlipTransform(TipTransform);
+	TipTransform.SetLocation(TipTransform.GetLocation() / 100);
+	TipTransform.SetScale3D(FVector(1.0, 1.0, 1.0));
 
-	KDL::Frame goal = KDL::Frame::Frame(goalrot, goalvec);
+	FTransform ParentBoneInComponent = Output.Pose.GetComponentSpaceTransform(Output.Pose.GetPose().GetParentBoneIndex(RootIndex));
+	ParentBoneInComponent = FlipTransform(ParentBoneInComponent);
+	ParentBoneInComponent.SetLocation(ParentBoneInComponent.GetLocation() / 100);
+	ParentBoneInComponent.SetScale3D(FVector(1.0, 1.0, 1.0));
+	FTransform TorsoInComponent = ParentBoneInComponent;
+	FTransform CurrentGoal = GoalInBoneSpace;
 
-	int resultInt = iksolver.CartToJnt(input, goal, result);
+	TipTransform = TipTransform * ParentBoneInComponent.Inverse();
+
+	//KDL Calculation
+	int maxDiv = 1;
+	int found = 0;
+	UE_LOG(LogTemp, Warning, TEXT("Goal for KDL Location: %s \n"), *CurrentGoal.ToHumanReadableString());
+	while (maxDiv)
+	{
+		maxDiv--;
+		FTransform CurrentDiff = TipTransform.Inverse()*CurrentGoal;
+		KDL::Vector goalvec = KDL::Vector::Vector(CurrentGoal.GetLocation().X, CurrentGoal.GetLocation().Y, CurrentGoal.GetLocation().Z);
+		KDL::Rotation goalrot = KDL::Rotation::Quaternion(CurrentGoal.GetRotation().X, CurrentGoal.GetRotation().Y, CurrentGoal.GetRotation().Z, CurrentGoal.GetRotation().W); 
+		//finalize goal frame for KDL
+		KDL::Frame goal = KDL::Frame::Frame(goalrot, goalvec);
+
+		int resultInt = iksolver.CartToJnt(input, goal, result);
+		int Jumpy = 0;
+		int Smooth = 1;
+		int counter = 0;
+		for (const TPair<int32, FName>& pair : NewNameToIndex) {
+			float old = 0.0;
+			if (this->previousAngles.Contains(FCompactPoseBoneIndex(pair.Key).GetInt()))
+			{
+				old = previousAngles[FCompactPoseBoneIndex(pair.Key).GetInt()];
+			}
+			float diff = old-result.data(counter);
+			if (0.25 < diff)
+			{
+				Jumpy = 1;
+				break;
+			}
+			counter++;
+		}
+		if ((KDL::ChainIkSolverPos_NR_JL::E_MAX_ITERATIONS_EXCEEDED == resultInt) || (Smooth && Jumpy)) {
+			UE_LOG(LogTemp, Error, TEXT("Max Iterrations exceeded."));
+			CurrentDiff.SetLocation(CurrentDiff.GetLocation()*0.9);
+			CurrentDiff.SetRotation(FQuat(CurrentDiff.GetRotation().GetRotationAxis(), CurrentDiff.GetRotation().GetAngle()*0.95));
+			CurrentGoal = CurrentDiff * TipTransform;
+		}
+		else {
+			found = 1;
+			maxDiv = 0;
+		}
+	}
+	if (!found)
+	{
+		unsigned int k = 0;
+		for (const TPair<int32, FName>& pair : NewNameToIndex) {
+			float old = 0.0;
+			if (this->previousAngles.Contains(FCompactPoseBoneIndex(pair.Key).GetInt()))
+			{
+				old = previousAngles[FCompactPoseBoneIndex(pair.Key).GetInt()];
+			}
+			result.data(k) = (temp_min_limits.data(k) + temp_max_limits.data(k))*0.5;
+			k++;
+		}
+	}
+
 	
-
-	UE_LOG(LogTemp, Warning, TEXT("Debugging soon"));
 	//these are JointAngles, aka floats, aka rotation around specified axis in radians
 	for (unsigned int i = 0; i < result.rows(); i++) {
-		UE_LOG(LogTemp, Warning, TEXT("input was %f"), input(i));
-		UE_LOG(LogTemp, Warning, TEXT("Ik solver result: %f"), result(i));
-		UE_LOG(LogTemp, Warning, TEXT("result counter: %d"), i);
+		//UE_LOG(LogTemp, Warning, TEXT("input was %f"), input(i));
+		//UE_LOG(LogTemp, Warning, TEXT("Ik solver result: %f"), result(i));
+		//UE_LOG(LogTemp, Warning, TEXT("result counter: %d"), i);
 	}
-	UE_LOG(LogTemp, Warning, TEXT("+++Start debugging+++"));
+	//UE_LOG(LogTemp, Warning, TEXT("+++Start debugging+++"));
 
-	//set rotations for all the bones. 
-	//iterate over all the bones
+
+	//std::vector<float> test(3);
+	//test[0] = EffectorGoalTransform.GetRotation().Rotator().Roll * 3.14 / 180;
+	//test[1] = EffectorGoalTransform.GetRotation().Rotator().Pitch * 3.14 / 180;
+	//test[2] = EffectorGoalTransform.GetRotation().Rotator().Yaw * 3.14 / 180;
+
+	//UE_LOG(LogTemp, Warning, TEXT("--------- After KDL Calculation ---------------------"));
+
+	
+	
+
 	int counter = 0;
-	for (const TPair<int32, FName>& pair : NameToIndex) {
+	for (const TPair<int32, FName>& pair : NewNameToIndex) {
+	
 		//get name of joint/link
 		std::string name(TCHAR_TO_UTF8(*pair.Value.ToString())); //convert ue4 string to normal string. 
 
-		UE_LOG(LogTemp, Warning, TEXT("Debug name: %s"), *pair.Value.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("Current Joint Name: %s"), *pair.Value.ToString());
 		// pair int index to unreal index
 		FCompactPoseBoneIndex index = FCompactPoseBoneIndex(pair.Key);
 
-		FTransform BoneTransform = Output.Pose.GetComponentSpaceTransform(index);
+		FTransform BoneTransform = Output.Pose.GetLocalSpaceTransform(index);
+		BoneTransform = FlipTransform(BoneTransform);
+		//Set axis vector for which the angle should be applied
+		Eigen::Vector3d vec;
+		//UE_LOG(LogTemp, Warning, TEXT("Set Vector axis. "));
+		switch (ikchain.getSegment(counter).getJoint().getType()) {
+		case KDL::Joint::RotX:
+			vec = Eigen::Vector3d(1.0, 0.0, 0.0);
+			//UE_LOG(LogTemp, Warning, TEXT("Axis: X"));
+			break;
 
-		
-		//transform transform to bone space, aka. relative from one bone to another (hopefully)
-		//TODO: if this doesn't work, check if another TranslationSpace will work
-		//TODO: map Joint Rotation Axis to User Input of Node
-		FAnimationRuntime::ConvertCSTransformToBoneSpace(ComponentTransform, Output.Pose, BoneTransform, index, TranslationSpace);
-		UE_LOG(LogTemp, Warning, TEXT("After some BoneSpace thingy conversion, before Eigen "));
-		//FQuat BoneRotation
+		case KDL::Joint::RotY:
+			vec = Eigen::Vector3d(0.0, 1.0, 0.0);
+			//UE_LOG(LogTemp, Warning, TEXT("Axis: Y"));
+			break;
 
-		//TODO match Axis to the User set Axis
-		//convert radians to matrix to quaternion to unreal quaternion
-		Eigen::AngleAxis<double> angle(result(counter), Eigen::Vector3d(0, 0, 1));
+		case KDL::Joint::RotZ:
+			vec = Eigen::Vector3d(0.0, 0.0, 1.0);
+			//UE_LOG(LogTemp, Warning, TEXT("Axis: Z"));
+			break;
+
+		default:
+			KDL::Vector tempVec = ikchain.getSegment(counter).getJoint().JointAxis();
+			vec = Eigen::Vector3d(tempVec.x(), tempVec.y(), tempVec.z());
+			FVector printVector(tempVec.x(), tempVec.y(), tempVec.z());
+			//UE_LOG(LogTemp, Warning, TEXT("Rotation Axis: %s"), *printVector.ToString());
+			break;
+		}
+
+		//put KDL result into proper transform
+		//Eigen::AngleAxis<double> angle(result(counter), vec);
+		std::vector<Eigen::Vector3d> angleTest(3);
+		angleTest[0] = Eigen::Vector3d(0.0, 0.0, 1.0);
+		angleTest[1] = Eigen::Vector3d(1.0, 0.0, 0.0);
+		angleTest[2] = Eigen::Vector3d(0.0, 1.0, 0.0);
+
+
+		Eigen::AngleAxis<double> angle(result(counter), vec);
 	 	Eigen::Matrix3d anglemat = angle.toRotationMatrix();
 		Eigen::Quaterniond eigenQuat(anglemat);
 		Eigen::Quaterniond normQuat = eigenQuat.normalized();
-	
+
+		this->previousAngles.Add(TPair<int32, float>(FCompactPoseBoneIndex(pair.Key).GetInt(), result(counter)));
 		
 		FQuat resultQuat(normQuat.x(), normQuat.y(), normQuat.z(), normQuat.w());
 	
-		UE_LOG(LogTemp, Warning, TEXT("After Eigen, quaternion: %s"), *resultQuat.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("After Eigen, the result quaternion is: %s"), *resultQuat.ToString());
 
-		//maybe ConcatenateRotation?
-		//BoneTransform.AccumulateWithShortestRotation();
+		FTransform ResultTransform;
+		ResultTransform.SetIdentity();
+		ResultTransform.SetRotation(resultQuat);
+
+		//FTransform ParentBoneInComponent = Output.Pose.GetComponentSpaceTransform(Output.Pose.GetPose().GetParentBoneIndex(index));
+		FTransform BoneLocalTransform = Output.Pose.GetLocalSpaceTransform(index);
+		BoneLocalTransform = FlipTransform(BoneLocalTransform);
+		FVector JointOriginUE = BoneLocalTransform.GetTranslation();
+		FTransform LocScale;
+		LocScale.SetTranslation(JointOriginUE);
+		//LocScale.SetScale3D(FVector(1.0, 1.0, 1.0));
+		 
+
+		FTransform LocalToComponentResult = ResultTransform * LocScale * ParentBoneInComponent;
+
+		if (name == "r_gripper_palm_link") {
+			LocalToComponentResult = GoalInBoneSpace * TorsoInComponent;
+			UE_LOG(LogTemp, Warning, TEXT("setting goal for palm"));
+		}
+
+		//hotfix
+		//LocalToComponentResult.SetLocation(Output.Pose.GetComponentSpaceTransform(index).GetLocation());
+		// this fixes some scaling issues and unwanted translation
+		FTransform OutputTransform = LocalToComponentResult;
+		OutputTransform = FlipTransform(OutputTransform);
+		OutputTransform.SetLocation(OutputTransform.GetLocation() * 100);
+		OutputTransform.SetScale3D(FVector(100.0, 100.0, 100.0));
+
+
+		OutBoneTransforms.Add(FBoneTransform(index, OutputTransform));
+		//UE_LOG(LogTemp, Warning, TEXT("Name of Bone: %s"), *pair.Value.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("--------------------------"));
+		//UE_LOG(LogTemp, Warning, TEXT("ParentBoneInComponent: %s \n"), *ParentBoneInComponent.ToMatrixWithScale().ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("LocScale: %s \n"), *LocScale.ToMatrixWithScale().ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("ResultTransform: %s \n"), *ResultTransform.ToMatrixWithScale().ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("LocalToComponentResult: %s \n"), *LocalToComponentResult.ToMatrixWithScale().ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("--------------------------"));
+		//ensure parent pose is the one we just computed
+		ParentBoneInComponent = LocalToComponentResult;
 		
-		BoneTransform.SetRotation(resultQuat * BoneTransform.GetRotation());
-		TipBone.GetCompactPoseIndex(BoneContainer);
-		//Output.AnimInstanceProxy->GetSkelMeshComponent()->GetBoneIndex(key);
 
-		FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, BoneTransform, index, TranslationSpace);
-		//OutBoneTransforms.Add(FBoneTransform(index, BoneTransform));
-	
-		TempTransform.Add(FBoneTransform(index, BoneTransform));
-		Output.Pose.LocalBlendCSBoneTransforms(TempTransform, 1.0);
-		TempTransform.Reset();
+		Output.Pose.LocalBlendCSBoneTransforms(OutBoneTransforms, 1.0);
+		OutBoneTransforms.Reset();
 
 		counter++;
 
 	}
-	UE_LOG(LogTemp, Warning, TEXT("After loop"));
+	//OutBoneTransforms.Reset();
+	//UE_LOG(LogTemp, Warning, TEXT("Moving One Bone"));
+	//PoseMesh = CreateDefaultSubobject<UPoseableMeshComponent>(TEXT("PosebleMesh"));
+	//static USkeletalMesh* ActorMesh = Output.AnimInstanceProxy->GetSkelMeshComponent()->SkeletalMesh;
+	//Output.AnimInstanceProxy->GetSkelMeshComponent()->SkeletalMesh;
+	//PoseMesh->SetupAttachment(RootComponent);
+	//PoseMesh->SetSkeletalMesh(ActorMesh.Object);
+	//UPoseableMeshComponent* PosableMeshComponent = a->CreateDefaultSubobject(this, TEXT("MeshComponent"));
+	//UPoseableMeshComponent* PosableMeshComponent = CreateDefaultSubobject(this, TEXT("MeshComponent"));
+	
+
+
+	//// This works
+	//TArray<FBoneTransform> tempArray;
+
+	//FCompactPoseBoneIndex ind2(79);
+	//FTransform temp2;// = Output.Pose.GetLocalSpaceTransform(ind2);
+	//temp2.SetIdentity();
+	//float zComp = GoalTransformComponentSpace.GetLocation().Z / 100;
+	//// w = cos(alpha/2), x=sin(alpha/2)*dx etc for y, z
+	//FQuat tempQ2(0.0, 0.0, -sin(zComp / 2), cos(zComp / 2));
+	////FQuat tempQ2(0, 0, -0.7071068, 0.7071068);
+
+
+	//temp2.SetRotation(tempQ2);
+	//FTransform FinalPose2 = temp2 * Output.Pose.GetComponentSpaceTransform(ind2);// 
+
+	////Output.Pose.SetComponentSpaceTransform(ind2, FinalPose2);
+	//tempArray.Add(FBoneTransform(ind2, FinalPose2));
+	//Output.Pose.LocalBlendCSBoneTransforms(tempArray, 1.0);
+	//tempArray.Reset();
+	//
+	//FCompactPoseBoneIndex ind(81);
+	//FTransform temp;  //Output.Pose.GetLocalSpaceTransform(ind);
+	//temp.SetIdentity();
+	////FQuat tempQ(-0.707, 0.0, 0.0, 0.707);
+	//float xComp = GoalTransformComponentSpace.GetLocation().X / 100;
+	//FQuat tempQ(-sin(xComp / 2), 0.0, 0.0, cos(xComp / 2));
+	//temp.SetRotation(tempQ);
+	//FTransform FinalPose = temp * Output.Pose.GetComponentSpaceTransform(ind);// *temp;
+	//
+	////Output.Pose.SetComponentSpaceTransform(ind, FinalPose);
+
+	//tempArray.Add(FBoneTransform(ind, FinalPose));
+	//Output.Pose.LocalBlendCSBoneTransforms(tempArray, 1.0);
+	//tempArray.Reset();
+	////FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, temp, ind, TranslationSpace);
+	////FAnimationRuntime::ConvertBoneSpaceTransformToCS(ComponentTransform, Output.Pose, temp2, ind2, TranslationSpace);
+	////tempArray.Add(FBoneTransform(ind, temp));
+	////tempArray.Add(FBoneTransform(ind2, temp2));
+	
+	
+	
 
 }
-//
+
 bool FAnimNode_PR2IK::IsValidToEvaluate(const USkeleton * Skeleton, const FBoneContainer & RequiredBones)
 {
 	return (TipBone.IsValidToEvaluate(RequiredBones));

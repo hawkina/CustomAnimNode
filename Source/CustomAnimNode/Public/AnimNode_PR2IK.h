@@ -8,6 +8,7 @@
 #include "BonePose.h"
 #include "BoneControllers/AnimNode_SkeletalControlBase.h"
 #include "ThirdParty/KDL/joint.hpp"
+#include "Components/PoseableMeshComponent.h"
 #include "AnimNode_PR2IK.generated.h"
 
 
@@ -156,7 +157,7 @@ public:
 	/* Add Limits to some of the bones. Note: Every bone needs to have a limit set. Starting from Tip back to root. */
 	UPROPERTY(EditAnywhere, Category = Settings)
 		TArray<FJointLimits> RangeLimits;
-	
+
 
 	/** Delta time */
 	float DeltaTime;
@@ -181,6 +182,11 @@ public:
 
 	/** Velocity of the owning actor */
 	FVector OwnerVelocity;
+
+	UPoseableMeshComponent* PosableMeshComponent;
+	UObject *a;
+
+	TMap<int32, float> previousAngles;
 
 public:
 	FAnimNode_PR2IK();
