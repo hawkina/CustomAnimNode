@@ -117,6 +117,18 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 			NewNameToIndex.Add(NameToIndex[k]);
 		}
 
+		//Init previousAngles with Default BoneAngle if we do not already have rpevious angles stored
+		for (const TPair<int32, FName>& pair : NewNameToIndex) {
+			for (int32 i = 0; i < RangeLimits.Num(); i++) {
+				if (RangeLimits[i].BoneName.BoneName == pair.Value) {
+
+					int32 mindex = FCompactPoseBoneIndex(pair.Key).GetInt();
+					if (!this->previousAngles.Contains(mindex)) {
+						previousAngles.Add(TPair<int32, float>(mindex, RangeLimits[i].DefaultBoneAngle));
+					}
+				}
+			}
+		}
 
 		//Print the list to ensure it is correct:
 		FString namePair;
@@ -283,10 +295,7 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 		// pair int index to unreal index
 		FCompactPoseBoneIndex index = FCompactPoseBoneIndex(pair.Key);
 
-		double oldAngle = 0.0;
-		if (this->previousAngles.Contains(index.GetInt())) {
-			oldAngle = previousAngles[index.GetInt()];
-		}
+		double oldAngle = previousAngles[index.GetInt()];
 		
 		//this is done for "seeding" aka give pose of where joint is right now instead of default. let's do it without first
 		if (n < ikchain.getNrOfJoints()) {
@@ -373,11 +382,7 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 		int Smooth = 1;
 		int counter = 0;
 		for (const TPair<int32, FName>& pair : NewNameToIndex) {
-			float old = 0.0;
-			if (this->previousAngles.Contains(FCompactPoseBoneIndex(pair.Key).GetInt()))
-			{
-				old = previousAngles[FCompactPoseBoneIndex(pair.Key).GetInt()];
-			}
+			float old = previousAngles[FCompactPoseBoneIndex(pair.Key).GetInt()];
 			float diff = old-result.data(counter);
 			if (0.25 < diff)
 			{
@@ -401,12 +406,8 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 	{
 		unsigned int k = 0;
 		for (const TPair<int32, FName>& pair : NewNameToIndex) {
-			float old = 0.0;
-			if (this->previousAngles.Contains(FCompactPoseBoneIndex(pair.Key).GetInt()))
-			{
-				old = previousAngles[FCompactPoseBoneIndex(pair.Key).GetInt()];
-			}
-			result.data(k) = (temp_min_limits.data(k) + temp_max_limits.data(k))*0.5;
+			float old = previousAngles[FCompactPoseBoneIndex(pair.Key).GetInt()];
+			result.data(k) = old;//(temp_min_limits.data(k) + temp_max_limits.data(k))*0.5;
 			k++;
 		}
 	}
@@ -518,14 +519,11 @@ void FAnimNode_PR2IK::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseConte
 		OutputTransform.SetScale3D(FVector(100.0, 100.0, 100.0));
 
 
+		//UE_LOG(LogTemp, Warning, TEXT("Bone Name: %s"), *pair.Value.ToString());
+		//UE_LOG(LogTemp, Warning, TEXT("Bone Angle: %f \n"), OutputTransform.GetRotation().GetAngle());
+
 		OutBoneTransforms.Add(FBoneTransform(index, OutputTransform));
-		//UE_LOG(LogTemp, Warning, TEXT("Name of Bone: %s"), *pair.Value.ToString());
-		//UE_LOG(LogTemp, Warning, TEXT("--------------------------"));
-		//UE_LOG(LogTemp, Warning, TEXT("ParentBoneInComponent: %s \n"), *ParentBoneInComponent.ToMatrixWithScale().ToString());
-		//UE_LOG(LogTemp, Warning, TEXT("LocScale: %s \n"), *LocScale.ToMatrixWithScale().ToString());
-		//UE_LOG(LogTemp, Warning, TEXT("ResultTransform: %s \n"), *ResultTransform.ToMatrixWithScale().ToString());
-		//UE_LOG(LogTemp, Warning, TEXT("LocalToComponentResult: %s \n"), *LocalToComponentResult.ToMatrixWithScale().ToString());
-		//UE_LOG(LogTemp, Warning, TEXT("--------------------------"));
+
 		//ensure parent pose is the one we just computed
 		ParentBoneInComponent = LocalToComponentResult;
 		

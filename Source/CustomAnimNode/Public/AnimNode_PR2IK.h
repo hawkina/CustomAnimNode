@@ -126,6 +126,10 @@ struct FJointLimits{
 	UPROPERTY(EditAnywhere, Category = Angular)
 		float LimitMax;
 
+	/** Offset for the bone**/
+	UPROPERTY(EditAnywhere, Category = Angular)
+		float DefaultBoneAngle;
+
 };
 
 
