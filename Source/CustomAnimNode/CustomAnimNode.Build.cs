@@ -18,16 +18,6 @@ public class CustomAnimNode : ModuleRules
     public CustomAnimNode(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-        //PublicIncludePaths.Add("ThirdParty");
-
-        //     PublicIncludePaths.AddRange(
-        //         new string[] {
-        //             "CustomAnimNode/Public"
-        //	// ... add public include paths required here ...
-        //}
-        //         );
-
-
 
         PublicIncludePaths.Add(Path.Combine(ModulePath, "Public"));
         PrivateIncludePaths.Add(Path.Combine(ModulePath, "Private"));
@@ -37,12 +27,6 @@ public class CustomAnimNode : ModuleRules
 
         PublicAdditionalLibraries.Add(Path.Combine(ModulePath, "ThirdParty/KDL/orocos-kdl.lib"));
 
-        //     PrivateIncludePaths.AddRange(
-        //         new string[] {
-        //             "CustomAnimNode/Private",
-        //	// ... add other private include paths required here ...
-        //}
-        //         );
 
 
         PublicDependencyModuleNames.AddRange(
@@ -53,7 +37,6 @@ public class CustomAnimNode : ModuleRules
                 "Engine",
                 "AnimationCore",
                 "AnimGraphRuntime",
-                //"KDL"
 				// ... add other public dependencies that you statically link with here ...
 			}
             );
@@ -62,8 +45,6 @@ public class CustomAnimNode : ModuleRules
         PrivateDependencyModuleNames.AddRange(
             new string[]
             {
-			
-                //"KDL"
                 // ... add private dependencies that you statically link with here ...	
 			}
             );

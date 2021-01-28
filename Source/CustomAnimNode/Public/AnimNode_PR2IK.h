@@ -14,77 +14,6 @@
 
 class USkeletalMeshComponent;
 
-//UENUM(BlueprintType)
-//enum class EIKFootRootLocalAxis : uint8
-//{
-//	NONE	UMETA(DisplayName = "NONE"),
-//	X		UMETA(DisplayName = "IKFootRootLocalX"),
-//	Y		UMETA(DisplayName = "IKFootRootLocalY"),
-//	Z		UMETA(DisplayName = "IKFootRootLocalZ")
-//};
-
-//USTRUCT(BlueprintType)
-//struct FIKBonesT
-//{
-//	GENERATED_BODY()
-//
-//		UPROPERTY(EditAnywhere, Category = Settings)
-//		FBoneReference IKFootBone;
-//
-//	UPROPERTY(EditAnywhere, Category = Settings)
-//		FBoneReference FKFootBone;
-//
-//	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Settings)
-//		int32 NumBonesInLimb;
-//
-//};
-
-//USTRUCT(BlueprintType)
-//struct FIKFootLocationT
-//{
-//	GENERATED_BODY()
-//
-//		UPROPERTY(EditAnywhere, Category = Settings)
-//		FVector LimbRootLocation;
-//
-//	UPROPERTY(EditAnywhere, Category = Settings)
-//		FVector OriginLocation;
-//
-//	UPROPERTY(EditAnywhere, Category = Settings)
-//		FVector ActualLocation;
-//
-//	UPROPERTY(EditAnywhere, Category = Settings)
-//		FVector NewLocation;
-//
-//	FIKFootLocationT() :
-//		LimbRootLocation(FVector(0.f, 0.f, 0.f)),
-//		OriginLocation(FVector(0.f, 0.f, 0.f)),
-//		ActualLocation(FVector(0.f, 0.f, 0.f)),
-//		NewLocation(FVector(0.f, 0.f, 0.f))
-//	{
-//
-//	}
-//
-//};
-
-//USTRUCT(BlueprintType)
-//struct FPelvisAdjustmentInterp
-//{
-//	GENERATED_BODY()
-//
-//		UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
-//		float Stiffness;
-//
-//	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Settings)
-//		float Dampen;
-//
-//	FPelvisAdjustmentInterp() :
-//		Stiffness(1.0f),
-//		Dampen(1.0f)
-//	{}
-//
-//};
-
 UENUM(BlueprintType)
 enum ELimitAxis{
 
@@ -157,7 +86,6 @@ public:
 	UPROPERTY(EditAnywhere, Category = Settings)
 		FBoneReference RootBone;
 
-	//TODO: Find a better way of doing this maybe.
 	/* Add Limits to some of the bones. Note: Every bone needs to have a limit set. Starting from Tip back to root. */
 	UPROPERTY(EditAnywhere, Category = Settings)
 		TArray<FJointLimits> RangeLimits;

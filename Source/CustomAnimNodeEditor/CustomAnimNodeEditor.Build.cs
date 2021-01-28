@@ -17,21 +17,6 @@ public class CustomAnimNodeEditor : ModuleRules
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicIncludePaths.Add(Path.Combine(ModulePath, "Public"));
         PrivateIncludePaths.Add(Path.Combine(ModulePath, "Private"));
-        //     PublicIncludePaths.AddRange(
-        //         new string[] {
-        //             "CustomAnimNodeEditor/Public"
-        //	// ... add public include paths required here ...
-        //}
-        //         );
-
-
-        //     PrivateIncludePaths.AddRange(
-        //         new string[] {
-        //             "CustomAnimNodeEditor/Private",
-        //	// ... add other private include paths required here ...
-        //}
-        //         );
-
 
         PublicDependencyModuleNames.AddRange(
             new string[]
